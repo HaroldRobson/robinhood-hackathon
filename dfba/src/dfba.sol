@@ -1,20 +1,22 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
+import {DualFlowRegistry} from "./DfbaRegistry.sol";
+
 interface IERC20 {
     function transfer(address to, uint256 value) external returns (bool);
     function transferFrom(address from, address to, uint256 value) external returns (bool);
     function decimals() external view returns (uint8);
 }
 
-contract DualFlowAuction {
-    bool transient locked;
+contract DualFlowAuction is DualFlowRegistry {
     modifier nonReentrant() {
         require(!locked, "reentrancy guard");
         locked = true;
         _;
         locked = false;
     }
+    bool transient locked;
 
     struct Order {
         uint256 asset_a_size;
@@ -65,7 +67,23 @@ contract DualFlowAuction {
     );
 
     event orderPlaced(
-        uint256 order_id, address user, uint256 asset_a_size, uint256 asset_b_size, bool is_ioc, bool is_bid
+        uint256 order_id,
+        address user,
+        uint256 asset_a_size,
+        uint256 asset_b_size,
+        bool is_ioc,
+        bool is_fok,
+        bool is_bid
+    );
+
+    event orderModified(
+        uint256 order_id,
+        address user,
+        uint256 asset_a_size,
+        uint256 asset_b_size,
+        bool is_ioc,
+        bool is_fok,
+        bool is_bid
     );
 
     event fillHappened(address maker, address taker, uint256 asset_a_size, uint256 asset_b_size, bool is_buyer_maker);
@@ -77,7 +95,7 @@ contract DualFlowAuction {
         bool is_bid,
         uint256 asset_a_size,
         uint256 asset_b_size
-    ) public nonReentrant returns (uint256) {
+    ) public nonReentrant notBlackListed returns (uint256) {
         bool is_taker = !is_maker;
         bool is_ask = !is_bid;
         uint256 previous;
@@ -139,11 +157,11 @@ contract DualFlowAuction {
         if (next == bestMakerAsk) bestMakerAsk = current;
         if (next == bestTakerAsk) bestTakerAsk = current;
 
-        emit orderPlaced(current, msg.sender, asset_a_size, asset_b_size, is_ioc, is_bid);
+        emit orderPlaced(current, msg.sender, asset_a_size, asset_b_size, is_fok, is_ioc, is_bid);
         return current;
     }
 
-    function cancelOrder(uint256 order_id) public {
+    function cancelOrder(uint256 order_id) public nonReentrant notBlackListed {
         require(Orders[order_id].user == msg.sender, "you are not the original sender");
         uint256 previous = Orders[order_id].previous;
         uint256 next = Orders[order_id].next;
@@ -154,6 +172,13 @@ contract DualFlowAuction {
         } else {
             require(IERC20(assetB).transfer(msg.sender, Orders[order_id].asset_b_size), "refund failed");
         }
+        emit orderCancelled(
+            order_id,
+            msg.sender,
+            Orders[order_id].asset_a_size,
+            Orders[order_id].asset_b_size,
+            OrderCancellationReason.UserCancelled
+        );
         // drop Orders[order_id] here?
     }
 
@@ -162,10 +187,13 @@ contract DualFlowAuction {
         require(Orders[order_id].user == msg.sender, "you are not the original sender");
         uint256 original_asset_a_size = Orders[order_id].asset_a_size;
         uint256 original_asset_b_size = Orders[order_id].asset_b_size;
-        Orders[order_id].asset_a_size = (original_asset_a_size * resize_multiple) / 1e18;
-        Orders[order_id].asset_b_size = (original_asset_b_size * resize_multiple) / 1e18;
+        uint256 newASize = (original_asset_a_size * resize_multiple) / 1e18;
+        uint256 newBSize = (original_asset_b_size * resize_multiple) / 1e18;
+        Orders[order_id].asset_a_size = newASize;
+        Orders[order_id].asset_b_size = newBSize;
         Orders[order_id].is_ioc = is_ioc;
         Orders[order_id].is_fok = is_fok;
+        emit orderModified(order_id, user, newASize, newBSize, is_ioc, is_fok, Orders[order_id].is_bid);
     }
 
     function triggerSettlement(bool is_bid_auction) public {
@@ -184,14 +212,12 @@ contract DualFlowAuction {
         uint256 currentBid = bestMakerBid;
         uint256 nextBid = Orders[bestMakerBid].next;
         uint256 currentAsk = bestTakerAsk;
-        uint256 nextAsk = Orders[bestAsk].next
+        uint256 nextAsk = Orders[bestAsk].next;
+        uint256 matchedVolume = 0;
         // find the worst ask still lower than the currentBid
-        //while Orders[currentAsk].asset_a_size * 
-        uint256[]
+        //while Orders[currentAsk].asset_a_size *
 
-        // starst going through them all adding to volume until wei have reached the worst ask. 
-
-            //
+        // starst going through them all adding to volume until wei have reached the worst ask.
     }
 
     /// the amount of asset_b that would be recieved from selling 1 asset_a
