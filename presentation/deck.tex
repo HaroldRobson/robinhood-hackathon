@@ -1,0 +1,232 @@
+\documentclass[aspectratio=169]{beamer}
+\usetheme{metropolis}
+\metroset{block=fill, progressbar=frametitle}
+
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning}
+
+\tikzset{
+  box/.style={draw=mDarkTeal, rounded corners, minimum width=2.8cm,
+              minimum height=0.8cm, align=center, font=\small},
+  auc/.style={box, fill=mLightBrown!20, draw=mLightBrown},
+  arr/.style={-{Stealth}, thick, mDarkTeal},
+}
+
+\title{\texorpdfstring{\alert{A New Kind of Exchange}}{A New Kind of Exchange}}
+\subtitle{Dual Flow Batch Auctions}
+\author{Harold Robson}
+\institute{Arbitrum Founder House Singapore $\cdot$ Robinhood Chain}
+\date{October 2026}
+
+\begin{document}
+
+\maketitle
+
+% ---------------------------------------------------------------
+\begin{frame}{CLOBs and the Technology Arms Race}
+  \begin{itemize}[<+->]
+    \item In a central limit order book, resting liquidity is matched against
+          incoming marketable orders by \textbf{price--time priority}.
+    \item As a market maker, you are never filled at a better price than your quote.
+    \item So quotes must be updated \textbf{as quickly as possible} to avoid
+          being arbitraged.
+    \item Top-of-book liquidity ends up thinner and wider than it could be.
+  \end{itemize}
+  \begin{alertblock}<+->{The result}
+    Market makers spend billions on HFT infrastructure, and it gets ``priced in''
+    to their quotes. Takers pay for microsecond-accurate prices when
+    milliseconds would suffice.
+  \end{alertblock}
+\end{frame}
+
+% ---------------------------------------------------------------
+\begin{frame}{TradFi's Solution: Closing Auctions}
+  \small
+  \begin{itemize}[<+->]
+    \item On European exchanges, roughly $\tfrac14$ of traded volume happens in
+          the closing auction.
+    \item Bids and asks are collected but not matched until a random close
+          $T + \tau$, $\tau \sim \mathrm{U}[0, x]$.
+    \item The closing price maximises matched volume:
+          $P^* = \arg\max_P \min\{D(P),\, S(P)\}$, where $D(P)$ is bid volume
+          at or above $P$ and $S(P)$ is ask volume at or below $P$.
+    \item All of it executes at exactly $P^*$.
+  \end{itemize}
+  \begin{alertblock}<+->{The result}
+    The closing price is trusted for derivative settlement, collateral
+    valuation and marking to market.
+  \end{alertblock}
+\end{frame}
+
+% ---------------------------------------------------------------
+\begin{frame}[standout]
+  Did any of that involve speed?
+\end{frame}
+
+\begin{frame}{Giving Makers What They Want}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      \textbf{Consider a market where takers\ldots}
+      \vspace{0.6em}
+      \begin{itemize}
+        \item<1-> trade only over the internet, with significant latency.
+        \item<2-> can't post resting liquidity.
+        \item<3-> trade against a \textbf{monopolistic} market maker,
+                  with no competition.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.44\textwidth}
+      \vspace{1.6em}
+      \centering
+      \only<4>{%
+        {\Large Does this sound fair?}\\[0.6em]
+        {\small\itshape not really\ldots}%
+      }%
+      \only<5->{%
+        {\Large Does this sound familiar?}\\[0.6em]
+        {\small\itshape yes, if you work in PFOF}%
+      }%
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Giving Makers What They Want}
+  \centering
+  {\large The result of our deeply unfair, predatory market:}\\[1.2em]
+  \begin{tabular}{@{}l@{\hspace{0.5em}}l@{}}
+    \uncover<2->{{\color{mLightGreen}\Large$\checkmark$}} & \uncover<2->{\Large Tight spreads} \\[0.3em]
+    \uncover<3->{{\color{mLightGreen}\Large$\checkmark$}} & \uncover<3->{\Large Ample liquidity} \\[0.3em]
+    \uncover<4->{{\color{mLightGreen}\Large$\checkmark$}} & \uncover<4->{\Large High execution rates}
+  \end{tabular}\\[1.2em]
+  \uncover<5->{{\Large\alert{What???}}}
+\end{frame}
+\begin{frame}{Giving Makers What They Want}
+  \begin{alertblock}{Why?}
+    \begin{itemize}
+      \item \textbf{All traded volume goes through the maker}: they always
+            earn the spread.
+      \item \textbf{Higher taker latency}: the maker can't get picked off.
+    \end{itemize}
+  \end{alertblock}
+\end{frame}
+
+\begin{frame}{Giving Makers What They Want}
+  \centering
+  {\large The maker \emph{can} afford to be this kind\ldots}\\[0.4em]
+  \uncover<2->{{\large\ldots but nothing incentivises it to.}}\\[2em]
+  \begin{columns}[T]
+    \begin{column}{0.4\textwidth}
+      \centering
+      \uncover<3->{%
+        {\small TradFi relies on}\\[0.3em]
+        {\Large \textbf{The Regulator}}}
+    \end{column}
+    \begin{column}{0.4\textwidth}
+      \centering
+      \uncover<4->{%
+        {\small DeFi just needs}\\[0.3em]
+    {\Large \alert{\textbf{a little competition...}}}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{The Proposal: \alert{Dual Flow} Batch Auction}
+  \begin{itemize}
+    \item Two auctions each batch: a \textbf{bid auction} and an
+          \textbf{ask auction}.
+    \item Each works like a TradFi closing auction, with one difference:
+          \alert{taker orders can only execute against maker orders}.
+  \end{itemize}
+  \vspace{1em}
+  \centering
+  \begin{tikzpicture}[node distance=1.2cm and 1.4cm]
+    \node[auc] (bidA) {Bid auction\\[-2pt]$\Rightarrow P_{\text{bid}}$};
+    \node[auc, below=0.5cm of bidA] (askA) {Ask auction\\[-2pt]$\Rightarrow P_{\text{ask}}$};
+    \node[box, left=of bidA]  (mb) {Maker bids};
+    \node[box, left=of askA]  (ma) {Maker asks};
+    \node[box, right=of bidA] (ts) {Taker sells};
+    \node[box, right=of askA] (tb) {Taker buys};
+    \draw[arr] (mb) -- (bidA);  \draw[arr] (ts) -- (bidA);
+    \draw[arr] (ma) -- (askA);  \draw[arr] (tb) -- (askA);
+  \end{tikzpicture}
+\end{frame}  \vspace{0.8em}
+
+
+% ---------------------------------------------------------------
+\begin{frame}{Who Can Make? Who Can Take?}
+  \centering
+  \begin{tikzpicture}[node distance=0.35cm and 1.2cm]
+    \node[auc, minimum width=3.2cm, minimum height=2.4cm] (dfba)
+      {DFBA\\market};
+    \node[box, above left=0.15cm and 1.4cm of dfba.west, anchor=south east]
+      (iss) {Tokenised stock\\issuer};
+    \node[box, below left=0.15cm and 1.4cm of dfba.west, anchor=north east]
+      (mm) {Approved\\market makers};
+    \node[box, right=1.4cm of dfba, minimum height=2.4cm] (any)
+      {Anyone\\[-2pt]\footnotesize (UI traders)};
+    \draw[arr] (iss.east) -- (dfba.west |- iss.east);
+    \draw[arr] (mm.east)  -- (dfba.west |- mm.east);
+    \draw[arr] (any) -- (dfba);
+    \node[above=0.15cm of iss, font=\small\bfseries, text=mDarkTeal] {Makers};
+    \node[above=0.15cm of any, font=\small\bfseries, text=mDarkTeal] {Takers};
+  \end{tikzpicture}
+
+  \vspace{1em}
+  \begin{alertblock}{Roles are set per market}
+    \raggedright
+    Maker and taker permissions are configurable on-chain --- e.g.\ only the
+    issuer of a tokenised stock may make its market.
+  \end{alertblock}
+\end{frame}
+
+% ---------------------------------------------------------------
+\begin{frame}{Why Robinhood Chain?}
+  \begin{itemize}[<+->]
+    \item \textbf{100ms blocks}: one batch per block gives sub-second
+          auctions natively.
+    \item \textbf{First-come, first-served sequencing}: and arrival order
+          within a batch doesn't matter anyway.
+    \item \textbf{Tokenised stocks live here}: the natural makers already
+          exist.
+  \end{itemize}
+\end{frame}
+
+
+
+\begin{frame}{Architecture}
+  \centering
+  \begin{tikzpicture}
+    \node[auc, minimum width=3.8cm, minimum height=2cm] (dfba) at (0,0)
+      {\textbf{DFBA contract}\\(Solidity)};
+    \node[box] (tk) at (-5.4, 1) {Takers};
+    \node[box, fill=white, double copy shadow={shadow xshift=3pt, shadow yshift=-3pt,
+          draw=mDarkTeal, fill=white}] (mk) at (-5.4, -1) {Makers};
+    \node[box, dashed, text=mDarkTeal!70] (cl) at (5.4, 1) {Chainlink};
+    \node[below=1pt of cl, font=\scriptsize\itshape, text=mDarkTeal!70]
+      {derivatives only};
+    \node[box] (rr) at (5.4, -1) {Role registry};
+    \draw[arr] (tk.east) -- node[above, sloped, font=\scriptsize] {orders} (dfba.west);
+    \draw[arr] (mk.east) -- node[below, sloped, pos=0.6, font=\scriptsize] {quotes} (dfba.west);
+    \draw[arr, dashed, draw=mDarkTeal!70] (cl.west) -- node[above, sloped, font=\scriptsize] {price} (dfba.east);
+    \draw[arr] (rr.west) -- node[below, sloped, font=\scriptsize] {permissions} (dfba.east);
+    \begin{scope}[on background layer]
+      \node[draw=mDarkTeal!50, dashed, rounded corners, inner sep=10pt,
+            fit=(dfba)(cl)(rr), label={[font=\scriptsize, text=mDarkTeal]below:Robinhood Chain}] {};
+    \end{scope}
+  \end{tikzpicture}
+
+  \vspace{0.8em}
+  \raggedright
+  \begin{itemize}
+    \item Matching and settlement \alert{fully on-chain} - no off-chain engine.
+    \item \alert{Maker price Improvement} - where you would have been picked off you now settle at a better price.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[standout]
+  Demo
+\end{frame}
+
+\end{document}
